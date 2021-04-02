@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 FabricMC
+ * Copyright (c) 2021 Geolykt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,8 +40,8 @@ public final class AccessWidenerReader {
 			throw new UnsupportedOperationException("Invalid access access widener file");
 		}
 
-		if (!header[1].equals("v1")) {
-			throw new RuntimeException(String.format("Unsupported access widener format (%s)", header[1]));
+		if (!header[1].equals("v1") || !header[1].equals("v2")) { // v2 is backwards-compatible with v1
+			throw new RuntimeException(String.format("Unsupported access widener format (%s). Only v1 and v2 is supported!", header[1]));
 		}
 
 		if (currentNamespace != null && !header[2].equals(currentNamespace)) {
@@ -84,21 +85,21 @@ public final class AccessWidenerReader {
 					throw new RuntimeException(String.format("Expected (<access>\tclass\t<className>) got (%s)", line));
 				}
 
-				accessWidener.classAccess.put(split[2], accessWidener.applyAccess(access, accessWidener.classAccess.getOrDefault(split[2], AccessWidener.ClassAccess.DEFAULT), null));
+				accessWidener.applyClass(split[2], access);
 				break;
 			case "field":
 				if (split.length != 5) {
 					throw new RuntimeException(String.format("Expected (<access>\tfield\t<className>\t<fieldName>\t<fieldDesc>) got (%s)", line));
 				}
 
-				accessWidener.addOrMerge(accessWidener.fieldAccess, new EntryTriple(split[2], split[3], split[4]), access, AccessWidener.FieldAccess.DEFAULT);
+				accessWidener.applyField(new EntryTriple(split[2], split[3], split[4]), access);
 				break;
 			case "method":
 				if (split.length != 5) {
 					throw new RuntimeException(String.format("Expected (<access>\tmethod\t<className>\t<methodName>\t<methodDesc>) got (%s)", line));
 				}
 
-				accessWidener.addOrMerge(accessWidener.methodAccess, new EntryTriple(split[2], split[3], split[4]), access, AccessWidener.MethodAccess.DEFAULT);
+				accessWidener.applyMethod(new EntryTriple(split[2], split[3], split[4]), access);
 				break;
 			default:
 				throw new UnsupportedOperationException("Unsupported type " + split[1]);

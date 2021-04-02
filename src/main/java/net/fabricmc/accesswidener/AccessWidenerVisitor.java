@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 FabricMC
+ * Copyright (c) 2021 Geolykt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +16,8 @@
  */
 
 package net.fabricmc.accesswidener;
+
+import java.util.List;
 
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.FieldVisitor;
@@ -41,7 +44,7 @@ public final class AccessWidenerVisitor extends ClassVisitor {
 		classAccess = access;
 		super.visit(
 				version,
-				accessWidener.getClassAccess(name).apply(access, name, classAccess),
+				accessWidener.applyClassAccess(name, access, access),
 				name,
 				signature,
 				superName,
@@ -55,14 +58,14 @@ public final class AccessWidenerVisitor extends ClassVisitor {
 				name,
 				outerName,
 				innerName,
-				accessWidener.getClassAccess(name).apply(access, name, classAccess)
+				accessWidener.applyClassAccess(name, access, classAccess)
 		);
 	}
 
 	@Override
 	public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
 		return super.visitField(
-				accessWidener.getFieldAccess(new EntryTriple(className, name, descriptor)).apply(access, name, classAccess),
+				accessWidener.applyFieldAccess(className, name, descriptor, classAccess, access),
 				name,
 				descriptor,
 				signature,
@@ -73,7 +76,7 @@ public final class AccessWidenerVisitor extends ClassVisitor {
 	@Override
 	public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
 		return new AccessWidenerMethodVisitor(super.visitMethod(
-				accessWidener.getMethodAccess(new EntryTriple(className, name, descriptor)).apply(access, name, classAccess),
+				accessWidener.applyMethodAccess(className, name, descriptor, classAccess, access),
 				name,
 				descriptor,
 				signature,
@@ -89,9 +92,9 @@ public final class AccessWidenerVisitor extends ClassVisitor {
 		@Override
 		public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
 			if (opcode == Opcodes.INVOKESPECIAL && owner.equals(className) && !name.equals("<init>")) {
-				AccessWidener.Access methodAccess = accessWidener.getMethodAccess(new EntryTriple(owner, name, descriptor));
+				List<AccessWidener.AccessOperator> ops = accessWidener.methodAccess.get(new EntryTriple(owner, name, descriptor));
 
-				if (methodAccess != AccessWidener.MethodAccess.DEFAULT) {
+				if (ops != null && !ops.isEmpty()) {
 					opcode = Opcodes.INVOKEVIRTUAL;
 				}
 			}

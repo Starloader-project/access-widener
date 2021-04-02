@@ -10,20 +10,15 @@ plugins {
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
-group "net.fabricmc"
+group "de.geolykt.starloader"
 archivesBaseName = "access-widener"
 
 def ENV = System.getenv()
-version = "1.0.2"
+version = "2.0.0"
 logger.lifecycle("Building AccessWidener: " + version)
 
 repositories {
 	mavenCentral()
-
-	maven {
-		name = "Fabric"
-		url = "https://maven.fabricmc.net/"
-	}
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -98,17 +93,17 @@ publishing {
 			pom {
 				name = 'access-widener'
 				description = 'Access widener provides a way to loosen the access limits of classes in a data drive manner.'
-				url = 'https://github.com/FabricMC/access-widener'
+				url = 'https://github.com/Starloader-project/access-widener'
 
 				scm {
-					connection = "scm:git:https://github.com/FabricMC/access-widener.git"
-					developerConnection = "scm:git:git@github.com:FabricMC/access-widener.git"
-					url = "https://github.com/FabricMC/access-widener"
+					connection = "scm:git:https://github.com/Starloader-project/access-widener.git"
+					developerConnection = "scm:git:git@github.com:Starloader-project/access-widener.git"
+					url = "https://github.com/Starloader-project/access-widener"
 				}
 
 				issueManagement {
 					system = "GitHub"
-					url = "https://github.com/FabricMC/access-widener/issues"
+					url = "https://github.com/Starloader-project/access-widener/issues"
 				}
 
 				licenses {
@@ -120,15 +115,9 @@ publishing {
 
 				developers {
 					developer {
-						id = "modmuss50"
-						name = "modmuss50"
-						email = "modmuss50@fabricmc.net"
-					}
-
-					developer {
-						id = "sfPlayer"
-						name = "Player"
-						email = "player@fabricmc.net"
+						id = "geolykt"
+						name = "geolykt"
+						email = "geolykt@geolykt.de"
 					}
 				}
 			}
@@ -165,7 +154,7 @@ publishing {
 // A task to ensure that the version being released has not already been released.
 task checkVersion {
 	doFirst {
-		def xml = new URL("https://maven.fabricmc.net/net/fabricmc/access-widener/maven-metadata.xml").text
+		def xml = new URL("https://geolykt.de/maven/de/geolykt/starloader/access-widener/maven-metadata.xml").text
 		def metadata = new XmlSlurper().parseText(xml)
 		def versions = metadata.versioning.versions.version*.text();
 		if (versions.contains(version)) {

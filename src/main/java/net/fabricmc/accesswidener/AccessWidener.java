@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 FabricMC
+ * Copyright (c) 2021 Geolykt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +17,10 @@
 
 package net.fabricmc.accesswidener;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -26,93 +29,10 @@ import org.objectweb.asm.Opcodes;
 
 public final class AccessWidener {
 	String namespace;
-	final Map<String, Access> classAccess = new HashMap<>();
-	final Map<EntryTriple, Access> methodAccess = new HashMap<>();
-	final Map<EntryTriple, Access> fieldAccess = new HashMap<>();
+	final Map<String, List<AccessOperator>> classAccess = new HashMap<>();
+	final Map<EntryTriple, List<AccessOperator>> methodAccess = new HashMap<>();
+	final Map<EntryTriple, List<AccessOperator>> fieldAccess = new HashMap<>();
 	final Set<String> classes = new LinkedHashSet<>();
-
-	void addOrMerge(Map<EntryTriple, Access> map, EntryTriple entry, Access access) {
-		if (entry == null || access == null) {
-			throw new RuntimeException("Input entry or access is null");
-		}
-
-		Access merged = null;
-
-		if (access instanceof ClassAccess) {
-			merged = ClassAccess.DEFAULT;
-		} else if (access instanceof MethodAccess) {
-			merged = MethodAccess.DEFAULT;
-		} else if (access instanceof FieldAccess) {
-			merged = FieldAccess.DEFAULT;
-		}
-
-		merged = mergeAccess(merged, access);
-
-		map.put(entry, merged);
-	}
-
-	private static Access mergeAccess(Access a, Access b) {
-		Access access = a;
-
-		if (b == ClassAccess.ACCESSIBLE || b == MethodAccess.ACCESSIBLE || b == FieldAccess.ACCESSIBLE || b == MethodAccess.ACCESSIBLE_EXTENDABLE || b == ClassAccess.ACCESSIBLE_EXTENDABLE || b == FieldAccess.ACCESSIBLE_MUTABLE) {
-			access = access.makeAccessible();
-		}
-
-		if (b == ClassAccess.EXTENDABLE || b == MethodAccess.EXTENDABLE || b == MethodAccess.ACCESSIBLE_EXTENDABLE || b == ClassAccess.ACCESSIBLE_EXTENDABLE) {
-			access = access.makeExtendable();
-		}
-
-		if (b == FieldAccess.MUTABLE || b == FieldAccess.ACCESSIBLE_MUTABLE) {
-			access = access.makeMutable();
-		}
-
-		return access;
-	}
-
-	void addOrMerge(Map<EntryTriple, Access> map, EntryTriple entry, String access, Access defaultAccess) {
-		if (entry == null || access == null) {
-			throw new RuntimeException("Input entry or access is null");
-		}
-
-		map.put(entry, applyAccess(access, map.getOrDefault(entry, defaultAccess), entry));
-	}
-
-	Access applyAccess(String input, Access access, EntryTriple entryTriple) {
-		switch (input.toLowerCase(Locale.ROOT)) {
-		case "accessible":
-			makeClassAccessible(entryTriple);
-			return access.makeAccessible();
-		case "extendable":
-			makeClassExtendable(entryTriple);
-			return access.makeExtendable();
-		case "mutable":
-			return access.makeMutable();
-		default:
-			throw new UnsupportedOperationException("Unknown access type:" + input);
-		}
-	}
-
-	private void makeClassAccessible(EntryTriple entryTriple) {
-		if (entryTriple == null) return;
-		classAccess.put(entryTriple.getOwner(), applyAccess("accessible", classAccess.getOrDefault(entryTriple.getOwner(), ClassAccess.DEFAULT), null));
-	}
-
-	private void makeClassExtendable(EntryTriple entryTriple) {
-		if (entryTriple == null) return;
-		classAccess.put(entryTriple.getOwner(), applyAccess("extendable", classAccess.getOrDefault(entryTriple.getOwner(), ClassAccess.DEFAULT), null));
-	}
-
-	Access getClassAccess(String className) {
-		return classAccess.getOrDefault(className, ClassAccess.DEFAULT);
-	}
-
-	Access getFieldAccess(EntryTriple entryTriple) {
-		return fieldAccess.getOrDefault(entryTriple, FieldAccess.DEFAULT);
-	}
-
-	Access getMethodAccess(EntryTriple entryTriple) {
-		return methodAccess.getOrDefault(entryTriple, MethodAccess.DEFAULT);
-	}
 
 	public Set<String> getTargets() {
 		return classes;
@@ -120,6 +40,94 @@ public final class AccessWidener {
 
 	public String getNamespace() {
 		return namespace;
+	}
+
+	void applyClass(String className, String access) {
+		List<AccessOperator> operators = classAccess.get(className);
+
+		if (operators == null) {
+			operators = new ArrayList<>();
+		}
+
+		switch (access.toLowerCase(Locale.ROOT)) {
+		case "accessible":
+			operators.add(new Public());
+			break;
+		case "extendable":
+			operators.add(new Extendable());
+			break;
+		case "mutable":
+			operators.add(new Mutable());
+			break;
+		case "natural":
+			operators.add(new Natural());
+			break;
+		case "denumerised":
+			operators.add(new Denumerised());
+			break;
+		default:
+			throw new UnsupportedOperationException("Unknown access type:" + access);
+		}
+
+		classAccess.put(className, operators);
+	}
+
+	void applyMethod(EntryTriple input, String access) {
+		List<AccessOperator> operators = methodAccess.get(input);
+
+		if (operators == null) {
+			operators = new ArrayList<>();
+		}
+
+		switch (access.toLowerCase(Locale.ROOT)) {
+		case "accessible":
+			operators.add(new Public());
+			break;
+		case "extendable":
+			operators.add(new Extendable());
+			break;
+		case "mutable":
+			operators.add(new Mutable());
+			break;
+		case "natural":
+			operators.add(new Natural());
+			break;
+		case "denumerised":
+			throw new UnsupportedOperationException(access + " is not applicable for the method " + input);
+		default:
+			throw new UnsupportedOperationException("Unknown access type:" + access);
+		}
+
+		methodAccess.put(input, operators);
+	}
+
+	void applyField(EntryTriple input, String access) {
+		List<AccessOperator> operators = fieldAccess.get(input);
+
+		if (operators == null) {
+			operators = new ArrayList<>();
+		}
+
+		switch (access.toLowerCase(Locale.ROOT)) {
+		case "accessible":
+			operators.add(new Public());
+			break;
+		case "extendable":
+			operators.add(new Extendable());
+			break;
+		case "mutable":
+			operators.add(new Mutable());
+			break;
+		case "natural":
+			operators.add(new Natural());
+			break;
+		case "denumerised":
+			throw new UnsupportedOperationException(access + " is not applicable for the field " + input);
+		default:
+			throw new UnsupportedOperationException("Unknown access type:" + access);
+		}
+
+		fieldAccess.put(input, operators);
 	}
 
 	private static int makePublic(int i) {
@@ -135,161 +143,145 @@ public final class AccessWidener {
 		return (i & ~(Opcodes.ACC_PRIVATE)) | Opcodes.ACC_PROTECTED;
 	}
 
-	private static int makeFinalIfPrivate(int access, String name, int ownerAccess) {
-		// Dont make constructors final
-		if (name.equals("<init>")) {
+	private static int removeFinal(int i) {
+		return i & ~Opcodes.ACC_FINAL;
+	}
+
+	private static int removeSynthetic(int i) {
+		return i & ~Opcodes.ACC_SYNTHETIC;
+	}
+
+	private static int removeEnum(int i) {
+		return i & ~Opcodes.ACC_ENUM;
+	}
+
+	int applyClassAccess(String className, int access, int outeraccess) {
+		List<AccessOperator> ops = classAccess.get(className);
+
+		if (ops == null) {
 			return access;
 		}
 
-		// Skip interface and static methods
-		if ((ownerAccess & Opcodes.ACC_INTERFACE) != 0 || (access & Opcodes.ACC_STATIC) != 0) {
-			return access;
-		}
-
-		if ((access & Opcodes.ACC_PRIVATE) != 0) {
-			return access | Opcodes.ACC_FINAL;
+		for (AccessOperator op : ops) {
+			access = op.apply(access, className, outeraccess);
 		}
 
 		return access;
 	}
 
-	private static int removeFinal(int i) {
-		return i & ~Opcodes.ACC_FINAL;
+	int applyMethodAccess(String className, String methodName, String methodDescripion, int classAcces, int access) {
+		List<AccessOperator> ops = methodAccess.get(new EntryTriple(className, methodName, methodDescripion));
+
+		if (ops == null) {
+			return access;
+		}
+
+		for (AccessOperator op : ops) {
+			access = op.apply(access, methodName, classAcces);
+		}
+
+		return access;
 	}
 
-	interface Access extends AccessOperator {
-		Access makeAccessible();
+	int applyFieldAccess(String className, String fieldName, String fieldDescripion, int classAcces, int access) {
+		List<AccessOperator> ops = methodAccess.get(new EntryTriple(className, fieldName, fieldDescripion));
 
-		Access makeExtendable();
-
-		Access makeMutable();
-	}
-
-	enum ClassAccess implements Access {
-		DEFAULT((access, name, ownerAccess) -> access),
-		ACCESSIBLE((access, name, ownerAccess) -> makePublic(access)),
-		EXTENDABLE((access, name, ownerAccess) -> makePublic(removeFinal(access))),
-		ACCESSIBLE_EXTENDABLE((access, name, ownerAccess) -> makePublic(removeFinal(access)));
-
-		private final AccessOperator operator;
-
-		ClassAccess(AccessOperator operator) {
-			this.operator = operator;
+		if (ops == null) {
+			return access;
 		}
 
-		@Override
-		public Access makeAccessible() {
-			if (this == EXTENDABLE || this == ACCESSIBLE_EXTENDABLE) {
-				return ACCESSIBLE_EXTENDABLE;
-			}
-
-			return ACCESSIBLE;
+		for (AccessOperator op : ops) {
+			access = op.apply(access, fieldName, classAcces);
 		}
 
-		@Override
-		public Access makeExtendable() {
-			if (this == ACCESSIBLE || this == ACCESSIBLE_EXTENDABLE) {
-				return ACCESSIBLE_EXTENDABLE;
-			}
-
-			return EXTENDABLE;
-		}
-
-		@Override
-		public Access makeMutable() {
-			throw new UnsupportedOperationException("Classes cannot be made mutable");
-		}
-
-		@Override
-		public int apply(int access, String targetName, int ownerAccess) {
-			return operator.apply(access, targetName, ownerAccess);
-		}
-	}
-
-	enum MethodAccess implements Access {
-		DEFAULT((access, name, ownerAccess) -> access),
-		ACCESSIBLE((access, name, ownerAccess) -> makePublic(makeFinalIfPrivate(access, name, ownerAccess))),
-		EXTENDABLE((access, name, ownerAccess) -> makeProtected(removeFinal(access))),
-		ACCESSIBLE_EXTENDABLE((access, name, owner) -> makePublic(removeFinal(access)));
-
-		private final AccessOperator operator;
-
-		MethodAccess(AccessOperator operator) {
-			this.operator = operator;
-		}
-
-		@Override
-		public Access makeAccessible() {
-			if (this == EXTENDABLE || this == ACCESSIBLE_EXTENDABLE) {
-				return ACCESSIBLE_EXTENDABLE;
-			}
-
-			return ACCESSIBLE;
-		}
-
-		@Override
-		public Access makeExtendable() {
-			if (this == ACCESSIBLE || this == ACCESSIBLE_EXTENDABLE) {
-				return ACCESSIBLE_EXTENDABLE;
-			}
-
-			return EXTENDABLE;
-		}
-
-		@Override
-		public Access makeMutable() {
-			throw new UnsupportedOperationException("Methods cannot be made mutable");
-		}
-
-		@Override
-		public int apply(int access, String targetName, int ownerAccess) {
-			return operator.apply(access, targetName, ownerAccess);
-		}
-	}
-
-	enum FieldAccess implements Access {
-		DEFAULT((access, name, ownerAccess) -> access),
-		ACCESSIBLE((access, name, ownerAccess) -> makePublic(access)),
-		MUTABLE((access, name, ownerAccess) -> removeFinal(access)),
-		ACCESSIBLE_MUTABLE((access, name, ownerAccess) -> makePublic(removeFinal(access)));
-
-		private final AccessOperator operator;
-
-		FieldAccess(AccessOperator operator) {
-			this.operator = operator;
-		}
-
-		@Override
-		public Access makeAccessible() {
-			if (this == MUTABLE || this == ACCESSIBLE_MUTABLE) {
-				return ACCESSIBLE_MUTABLE;
-			}
-
-			return ACCESSIBLE;
-		}
-
-		@Override
-		public Access makeExtendable() {
-			throw new UnsupportedOperationException("Fields cannot be made extendable");
-		}
-
-		@Override
-		public Access makeMutable() {
-			if (this == ACCESSIBLE || this == ACCESSIBLE_MUTABLE) {
-				return ACCESSIBLE_MUTABLE;
-			}
-
-			return MUTABLE;
-		}
-
-		@Override
-		public int apply(int access, String targetName, int ownerAccess) {
-			return operator.apply(access, targetName, ownerAccess);
-		}
+		return access;
 	}
 
 	@FunctionalInterface
 	interface AccessOperator {
+		/**
+		 * Applies the operator.
+		 *
+		 * @param access The old access
+		 * @param targetName The target instance
+		 * @param ownerAccess The access of the owning type
+		 * @return The new access
+		 */
 		int apply(int access, String targetName, int ownerAccess);
+	}
+
+	/**
+	 * Removes the final status.
+	 */
+	class Mutable implements AccessOperator {
+		@Override
+		public int apply(int access, String targetName, int ownerAccess) {
+			return removeFinal(access);
+		}
+
+		@Override
+		public String toString() {
+			return "mutable";
+		}
+	}
+
+	/**
+	 * Makes the component protected and removes the final status.
+	 */
+	class Extendable implements AccessOperator {
+		@Override
+		public int apply(int access, String targetName, int ownerAccess) {
+			return makeProtected(removeFinal(access));
+		}
+
+		@Override
+		public String toString() {
+			return "extendable";
+		}
+	}
+
+	/**
+	 * Makes the component public.
+	 */
+	class Public implements AccessOperator {
+		@Override
+		public int apply(int access, String targetName, int ownerAccess) {
+			return makePublic(access);
+		}
+
+		@Override
+		public String toString() {
+			return "accessible";
+		}
+	}
+
+	/**
+	 * Strips the synthetic flag.
+	 */
+	class Natural implements AccessOperator {
+		@Override
+		public int apply(int access, String targetName, int ownerAccess) {
+			return removeSynthetic(access);
+		}
+
+		@Override
+		public String toString() {
+			return "natural";
+		}
+	}
+
+	/**
+	 * Strips the enum flag.
+	 */
+	class Denumerised implements AccessOperator {
+		@Override
+		public int apply(int access, String targetName, int ownerAccess) {
+			return removeEnum(access);
+		}
+
+		@Override
+		public String toString() {
+			return "denumerised";
+		}
 	}
 }

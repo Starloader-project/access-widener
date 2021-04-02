@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 FabricMC
+ * Copyright (c) 2021 Geolykt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +17,7 @@
 
 package net.fabricmc.accesswidener;
 
+import java.util.List;
 import java.util.Map;
 
 import org.objectweb.asm.commons.Remapper;
@@ -40,18 +42,9 @@ public final class AccessWidenerRemapper {
 		AccessWidener remapped = new AccessWidener();
 		remapped.namespace = to;
 
-		for (Map.Entry<String, AccessWidener.Access> entry : input.classAccess.entrySet()) {
-			remapped.classAccess.put(remapper.map(entry.getKey()), entry.getValue());
-		}
-
-		for (Map.Entry<EntryTriple, AccessWidener.Access> entry : input.methodAccess.entrySet()) {
-			remapped.addOrMerge(remapped.methodAccess, remapMethod(entry.getKey()), entry.getValue());
-		}
-
-		for (Map.Entry<EntryTriple, AccessWidener.Access> entry : input.fieldAccess.entrySet()) {
-			remapped.addOrMerge(remapped.fieldAccess, remapField(entry.getKey()), entry.getValue());
-		}
-
+		remapKeysClass(remapped.classAccess, input.classAccess);
+		remapKeysMethod(remapped.methodAccess, input.methodAccess);
+		remapKeysField(remapped.fieldAccess, input.fieldAccess);
 		return remapped;
 	}
 
@@ -69,5 +62,23 @@ public final class AccessWidenerRemapper {
 				remapper.mapFieldName(entryTriple.getOwner(), entryTriple.getName(), entryTriple.getDesc()),
 				remapper.mapDesc(entryTriple.getDesc())
 		);
+	}
+
+	private <T> void remapKeysClass(Map<String, List<T>> to, Map<String, List<T>> from) {
+		for (Map.Entry<String, List<T>> entry : from.entrySet()) {
+			to.put(remapper.map(entry.getKey()), entry.getValue());
+		}
+	}
+
+	private <T> void remapKeysMethod(Map<EntryTriple, List<T>> to, Map<EntryTriple, List<T>> from) {
+		for (Map.Entry<EntryTriple, List<T>> entry : from.entrySet()) {
+			to.put(remapMethod(entry.getKey()), entry.getValue());
+		}
+	}
+
+	private <T> void remapKeysField(Map<EntryTriple, List<T>> to, Map<EntryTriple, List<T>> from) {
+		for (Map.Entry<EntryTriple, List<T>> entry : from.entrySet()) {
+			to.put(remapField(entry.getKey()), entry.getValue());
+		}
 	}
 }
