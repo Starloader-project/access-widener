@@ -40,7 +40,7 @@ public final class AccessWidenerReader {
 			throw new UnsupportedOperationException("Invalid access access widener file");
 		}
 
-		if (!header[1].equals("v1") || !header[1].equals("v2")) { // v2 is backwards-compatible with v1
+		if (!(header[1].equals("v1") || header[1].equals("v2"))) { // v2 is backwards-compatible with v1
 			throw new RuntimeException(String.format("Unsupported access widener format (%s). Only v1 and v2 is supported!", header[1]));
 		}
 
