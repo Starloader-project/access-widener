@@ -184,7 +184,7 @@ public final class AccessWidener {
 	}
 
 	int applyFieldAccess(String className, String fieldName, String fieldDescripion, int classAcces, int access) {
-		List<AccessOperator> ops = methodAccess.get(new EntryTriple(className, fieldName, fieldDescripion));
+		List<AccessOperator> ops = fieldAccess.get(new EntryTriple(className, fieldName, fieldDescripion));
 
 		if (ops == null) {
 			return access;
