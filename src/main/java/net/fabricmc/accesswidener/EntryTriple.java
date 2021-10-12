@@ -40,10 +40,12 @@ final class EntryTriple {
 		return this.desc;
 	}
 
+	@Override
 	public String toString() {
 		return "EntryTriple{owner=" + this.owner + ",name=" + this.name + ",desc=" + this.desc + "}";
 	}
 
+	@Override
 	public boolean equals(Object o) {
 		if (!(o instanceof EntryTriple)) {
 			return false;
@@ -55,6 +57,7 @@ final class EntryTriple {
 		}
 	}
 
+	@Override
 	public int hashCode() {
 		return this.owner.hashCode() * 37 + this.name.hashCode() * 19 + this.desc.hashCode();
 	}
